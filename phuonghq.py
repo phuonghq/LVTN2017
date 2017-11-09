@@ -19,7 +19,7 @@ import csv
 import numpy as np
 import tensorflow as tf
 import os
-from utils import model_fn,load_data,scale_data,prepare_print_file,plot_segment
+from utils import model_fn,load_data,scale_data,file_to_print,plot_segment
 import datetime
 
 FLAGS = None
@@ -30,9 +30,9 @@ tf.logging.set_verbosity(tf.logging.INFO)
 # Learning rate for the model
 # 0.0001 -0.0002
 LEARNING_RATE = 0.000005
-file_train = r"C:\Users\lovel\LV\Data_train/2017-05/2017-05-17.csv"
-file_test = r"C:\Users\lovel\LV\Data_test/2017-05/2017-05-03.csv"
-file_predict = r"C:\Users\lovel\LV\Data_predict/2017-05/2017-05-31.csv"
+file_train = r"C:\Users\lovel\LV\LVTN2017/Data_train/2017-05/2017-05-17.csv"
+file_test = r"C:\Users\lovel\LV\LVTN2017/Data_test/2017-05/2017-05-03.csv"
+file_predict = r"C:\Users\lovel\LV\LVTN2017/Data_predict/2017-05/2017-05-31.csv"
 
 #file_train = r"/home/tesla/Desktop/LV/Data_train/2017-05/2017-05-17.csv"
 #file_test = r"/home/tesla/Desktop/LV/Data_test/2017-05/2017-05-25.csv"
@@ -42,19 +42,13 @@ file_predict = r"C:\Users\lovel\LV\Data_predict/2017-05/2017-05-31.csv"
 def main(unused_argv):
     # Load datasets
     rootPath = os.path.abspath(os.path.dirname(__file__))
-    training_set = tf.contrib.learn.datasets.base.load_csv_without_header(
-        filename=file_train, target_dtype=np.float64, features_dtype=np.float32)
-    training_set = load_data(rootPath,'/Data_train/')
+    training_set = load_data(rootPath,'/Data_train/','training_set')
 
     # Test examples
-    test_set = tf.contrib.learn.datasets.base.load_csv_without_header(
-        filename=file_test, target_dtype=np.float64, features_dtype=np.float32)
-    test_set = load_data(rootPath,'/Data_test/')
+    test_set = load_data(rootPath,'/Data_test/','test_set')
 
     # Set of 7 days lastest for which to predict velocity
-    prediction_set = tf.contrib.learn.datasets.base.load_csv_without_header(
-        filename=file_predict, target_dtype=np.float64, features_dtype=np.float32)
-    prediction_set = load_data(rootPath,'/Data_predict/')
+    prediction_set = load_data(rootPath,'/Data_predict/','prediction_set')
 
     # Set model params
     model_params = {"learning_rate": LEARNING_RATE}
@@ -63,16 +57,15 @@ def main(unused_argv):
     nn = tf.estimator.Estimator(model_fn=model_fn, params=model_params)
     # nn = tf.estimator.Estimator(model_fn=simple_rnn, params=model_params)
 
-    print(test_set[0])
-    scale_data(training_set)
-    scale_data(test_set)
-    scale_data(prediction_set)
-
+    scale_data(training_set.data)
+    scale_data(test_set.data)
+    scale_data(prediction_set.data)
 
     print(training_set[0])
+
     train_input_fn = tf.estimator.inputs.numpy_input_fn(
-        x={"x": training_set[0]},
-        y=np.array(training_set[1]),
+        x={"x": training_set.data},
+        y=np.array(training_set.target),
         num_epochs=None,  # 0
         batch_size=100,
         shuffle=True)
@@ -84,8 +77,8 @@ def main(unused_argv):
 
     # Score accuracy
     test_input_fn = tf.estimator.inputs.numpy_input_fn(
-        x={"x": test_set[0]},
-        y=np.array(test_set[1]),
+        x={"x":test_set.data},
+        y=np.array(test_set.target),
         num_epochs=1,
         batch_size=100,
         shuffle=False)
@@ -96,7 +89,7 @@ def main(unused_argv):
 
     # Print out predictions
     predict_input_fn = tf.estimator.inputs.numpy_input_fn(
-        x={"x": prediction_set[0]},
+        x={"x": prediction_set.data},
         num_epochs=1,
         shuffle=False)
     predictions = nn.predict(input_fn=predict_input_fn)
@@ -124,12 +117,11 @@ def main(unused_argv):
     plot_segment()
     cur_day_of_week = datetime.datetime.today().weekday()
     print(cur_day_of_week)
-    file_print = prepare_print_file(rootPath,'/Data_predict/',cur_day_of_week)
+    file_print = file_to_print(rootPath,'/Data_predict/',cur_day_of_week)
     with open(file_print, 'r') as fin, open('new_predict.csv', 'w') as fout:
     # with open(file_predict, 'r') as fin, open('new_predict.csv', 'w') as fout:
 
         index = 0
-        # fout.write(line.replace('\n', ', ' + 'Predict' + '\n'))
         for line in iter(fin.readline, ''):
             if index == 0:
                 fout.write(line.replace('\n', ', ' + str(tmpArr[index]) +',' + 'MSE: ' + str(ev['loss']) +',' + 'RMSE: ' + str(ev['rmse']) +',' + 'MAPE: ' + str(ev['mape'])+',' + 'MASE: ' + str(ev['mase'])  + '\n'))

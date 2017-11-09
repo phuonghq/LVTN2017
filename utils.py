@@ -15,7 +15,7 @@ import numpy as np
 import os
 from tensorflow.contrib import rnn
 import datetime
-
+import pandas as pd
 
 FLAGS = None
 tmpArr = []
@@ -70,27 +70,42 @@ NODE = 100
 #         loss=loss,
 #         train_op=train_op,
 #         eval_metric_ops=eval_metric_ops)
-def scale_data(dataset):
-    for v in enumerate(dataset[0]):
-        v[1][0] = int(v[1][0]) / 16
-        v[1][2] = int(v[1][2]) / 20640
-        v[1][3] = int(v[1][3]) / 10
-
-def load_data(rootPath, dir):
-    dataset = []
+def load_data(rootPath,dir,dataset):
+    frame = pd.DataFrame()
     for subDir in os.listdir(rootPath + dir):
         sub_dir = rootPath + dir + subDir
         print(sub_dir)
         if (os.path.isdir(sub_dir)):
+            list_ = []
             for filePath in os.listdir(sub_dir):
                 filePath = sub_dir + "/" + filePath
-                tmp = tf.contrib.learn.datasets.base.load_csv_without_header(
-                    filename=filePath, target_dtype=np.float64, features_dtype=np.float32)
-                dataset.append(tmp)
-                print(dataset)
-                # print(np.array(dataset[0]).shape)
+                # print(filePath)
+                # df = pd.read_csv(filePath,index_col = 0)
+                df = pd.read_csv(filePath,sep=',',header=None,index_col=0)
+
+                # print(df)
+                list_.append(df)
+                # print(list_)
+            print(list_)
+            frame = pd.concat(list_)
+    # frame.to_csv(dataset+ '.csv',sep =',')
+    print(frame)
+    frame.to_csv(dataset+ '.csv',sep =',')
+    dataset = tf.contrib.learn.datasets.base.load_csv_without_header(
+        filename=dataset + '.csv', target_dtype=np.float64, features_dtype=np.float32)
     return dataset
-def prepare_print_file(rootPath,dir,cur_day_of_weeks):
+
+def scale_data(dataset):
+    print(dataset)
+    for v in enumerate(dataset):
+        v[1][0] = int(v[1][0]) / 16
+        v[1][2] = int(v[1][2]) / 20640
+        v[1][3] = int(v[1][3]) / 10
+
+    print('test:')
+    print(dataset)
+
+def file_to_print(rootPath,dir,cur_day_of_weeks):
     for subDir in os.listdir(rootPath + dir):
         sub_dir = rootPath + dir + subDir
         if (os.path.isdir(sub_dir)):
