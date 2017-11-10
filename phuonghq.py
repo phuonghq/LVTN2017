@@ -9,7 +9,7 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 from matplotlib import pyplot as plt
-
+import random
 import argparse
 import sys
 import tempfile
@@ -19,10 +19,11 @@ import csv
 import numpy as np
 import tensorflow as tf
 import os
-from utils import model_fn,load_data,scale_data,file_to_print,plot_segment
+from utils import model_fn,load_data,scale_data,file_to_print,plot_segment,print_file
 import datetime
 
 FLAGS = None
+COUNT_COLUMN = 6 #column of data input
 tmpArr = []
 
 tf.logging.set_verbosity(tf.logging.INFO)
@@ -95,9 +96,7 @@ def main(unused_argv):
     predictions = nn.predict(input_fn=predict_input_fn)
     print(predictions)
     for i, p in enumerate(predictions):
-        # print("Prediction %s: %s" % (i + 1, p['velocity']))
-        print("Prediction %s: %s" % (i + 1, p))
-
+        print("Prediction %s: %s" % (i + 1, p['velocity']))
         tmpArr.append(p['velocity'])
 
     print(ev)
@@ -114,32 +113,62 @@ def main(unused_argv):
     print(prediction_set[0].shape)
 
     ###print predict value to csv file
-    plot_segment()
-    cur_day_of_week = datetime.datetime.today().weekday()
-    print(cur_day_of_week)
-    file_print = file_to_print(rootPath,'/Data_predict/',cur_day_of_week)
-    with open(file_print, 'r') as fin, open('new_predict.csv', 'w') as fout:
-    # with open(file_predict, 'r') as fin, open('new_predict.csv', 'w') as fout:
+    # plot_segment()
+    tempSeg = []
+    tempVeloToMap = []
+    # cur_day_of_week = datetime.datetime.today().weekday()
+    # print(cur_day_of_week)
+    file_plot = print_file(rootPath,ev,tmpArr)
+    print(file_plot)
+    # plot plot_segment.
+    with open(file_plot, 'r') as f:
+        reader = csv.DictReader(f)
+        print(reader)
+        for row in reader:
+            i =0
+            for k, v in row.items():         # get segment_id
+                if i % COUNT_COLUMN == 2:
+                    tempSeg.append(v)
+                i+= 1
+        #select random segment to plot
+        rand_seg = random.choice(list(tempSeg))
+        print(rand_seg)
+        print('---------')
+    with open(file_plot, 'rb') as f:
+        reader = csv.DictReader(f)
+        # rows = [row for row in reader for k in row.items() if row['Total_Depth'] != '0']
+        for row in reader:  # for each row in the reader object
+            if row[2] == rand_seg:
+                for h, v in row:
+                    tempVeloToMap[h].append(v)
 
-        index = 0
-        for line in iter(fin.readline, ''):
-            if index == 0:
-                fout.write(line.replace('\n', ', ' + str(tmpArr[index]) +',' + 'MSE: ' + str(ev['loss']) +',' + 'RMSE: ' + str(ev['rmse']) +',' + 'MAPE: ' + str(ev['mape'])+',' + 'MASE: ' + str(ev['mase'])  + '\n'))
-            else:
-                fout.write(line.replace('\n', ', ' + str(tmpArr[index])  + '\n'))
-            index += 1
+
+    with open(file_plot, 'r') as f:
+        reader = csv.DictReader(f)
+        for row in reader:
+            i = 0
+            m = 0
+            j = 0
+            for k, v in row.items():         # get segment_id
+                print('---------')
+                # print(rand_seg)
+                print(v)
+                # print(m)
+                print('--------')
+                # if i % COUNT_COLUMN == 2:
+                #     m = v
+                # # if m == rand_seg:
+                # if m == 37:
+                #
+                #     j += 1
+                #     if j == 4:
+                #         tempVeloToMap.append(v)
+                # i += 1
+        print(tempVeloToMap)
+
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.register("type", "bool", lambda v: v.lower() == "true")
-    parser.add_argument(
-        "--train_data", type=str, default="", help="Path to the training data.")
-    parser.add_argument(
-        "--test_data", type=str, default="", help="Path to the test data.")
-    parser.add_argument(
-        "--predict_data",
-        type=str,
-        default="",
-        help="Path to the prediction data.")
     FLAGS, unparsed = parser.parse_known_args()
     tf.app.run(main=main, argv=[sys.argv[0]] + unparsed)

@@ -9,7 +9,7 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 from matplotlib import pyplot as plt
-
+import csv
 import tensorflow as tf
 import numpy as np
 import os
@@ -18,7 +18,7 @@ import datetime
 import pandas as pd
 
 FLAGS = None
-tmpArr = []
+COUNT_COLUMN = 6
 
 tf.logging.set_verbosity(tf.logging.INFO)
 
@@ -79,7 +79,7 @@ def load_data(rootPath,dir,dataset):
             list_ = []
             for filePath in os.listdir(sub_dir):
                 filePath = sub_dir + "/" + filePath
-                # print(filePath)
+                print(filePath)
                 # df = pd.read_csv(filePath,index_col = 0)
                 df = pd.read_csv(filePath,sep=',',header=None,index_col=0)
 
@@ -105,6 +105,20 @@ def scale_data(dataset):
     print('test:')
     print(dataset)
 
+# def appendVeloToMap(segment,output_file):
+#     tmpVeloToMap = []
+#     with open(output_file, 'r') as f:
+#         reader = csv.DictReader(f)
+#         print(reader)
+#         for row in reader:
+#             i =0
+#             for k, v in row.items():         # get segment_id
+#                 print(v)
+#                 print('--------')
+#                 if i% COUNT_COLUMN == 5 and data = :
+#                     tmpVeloToMap.append(v)
+#                 i+= 1
+#     return tmpVeloToMap
 def file_to_print(rootPath,dir,cur_day_of_weeks):
     for subDir in os.listdir(rootPath + dir):
         sub_dir = rootPath + dir + subDir
@@ -118,6 +132,25 @@ def file_to_print(rootPath,dir,cur_day_of_weeks):
                     print(filePath)
                     return filePath
 
+def print_file(rootPath,ev,predictArr):
+    index =1
+    for day_of_week in range(0, 6):
+        file_print = file_to_print(rootPath, '/Data_predict/', day_of_week)
+        print(file_print)
+        print(ev)
+        if file_print is not None:
+            with open(file_print, 'r') as fin, open('day' + str(day_of_week) + '.csv', 'w') as fout:
+                first_row = True
+                for line in iter(fin.readline, ''):
+                    if index == 1 or first_row == True:
+                        fout.write(line.replace('\n', ', ' + str(predictArr[index]) + ',' + 'MSE: ' + str(ev['loss']) + ',' + 'RMSE: ' + str(ev['rmse']) + ',' + 'MAPE: ' + str( ev['mape']) + ',' + 'MASE: ' + str(ev['mase']) + '\n'))
+                        first_row = False
+                    else:
+                        fout.write(line.replace('\n', ', ' + str(predictArr[index]) + '\n'))
+                    index += 1
+            file_plot = file_print
+        day_of_week += 1
+    return file_plot
 def model_fn(features, labels, mode, params):
     """Model function for Estimator."""
 
@@ -180,8 +213,37 @@ def mean_absolute_scaled_error(labels,predictions):
 def plot_segment():
     # x = np.array([datetime.datetime(2017, 11, 17, 0, i) for i in range(60)])
     # y = np.random.randint(100, size=x.shape)
+
+    fig = plt.figure()
+    fig.suptitle('Velocity in day of segment', fontsize=14, fontweight='bold')
+
+    ax = fig.add_subplot(111)
+    fig.subplots_adjust(top=0.85)
+    ax.set_title('Segment')
+
+    ax.set_xlabel('Frame')
+    ax.set_ylabel('Velocity')
+
+    ax.text(3, 8, 'boxed italics text in data coords', style='italic',
+            bbox={'facecolor': 'red', 'alpha': 0.5, 'pad': 10})
+
+    ax.text(2, 6, r'an equation: $E=mc^2$', fontsize=15)
+
+    ax.text(3, 2, u'unicode:PHUONGHQ')
+
+    ax.text(0.95, 0.01, 'colored text in axes coords',
+            verticalalignment='bottom', horizontalalignment='right',
+            transform=ax.transAxes,
+            color='green', fontsize=15)
+
+    ax.plot([2], [1], 'o')
+    ax.annotate('annotate', xy=(2, 1), xytext=(3, 4),
+                arrowprops=dict(facecolor='black', shrink=0.05))
+
+    # ax.axis([0, 10, 0, 10])
     x = np.array([i for i in range(95)])
     y = np.random.randint(100, size=x.shape)
 
     plt.plot(x, y)
     plt.show()
+    fig.savefig('test.jpg')
