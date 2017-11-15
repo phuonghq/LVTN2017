@@ -16,9 +16,10 @@ import os
 from tensorflow.contrib import rnn
 import datetime
 import pandas as pd
-
+import re
 FLAGS = None
 COUNT_COLUMN = 6
+EVAL_FILE = '/tmp/phuong/ev.csv'
 
 tf.logging.set_verbosity(tf.logging.INFO)
 
@@ -77,53 +78,28 @@ def load_data(rootPath,dir,dataset):
         print(sub_dir)
         if (os.path.isdir(sub_dir)):
             list_ = []
-            for filePath in os.listdir(sub_dir):
+            for filePath in sorted(os.listdir(sub_dir)):
                 filePath = sub_dir + "/" + filePath
                 print(filePath)
-                # df = pd.read_csv(filePath,index_col = 0)
                 df = pd.read_csv(filePath,sep=',',header=None,index_col=0)
-
-                # print(df)
                 list_.append(df)
-                # print(list_)
-            print(list_)
             frame = pd.concat(list_)
-    # frame.to_csv(dataset+ '.csv',sep =',')
-    print(frame)
     frame.to_csv(dataset+ '.csv',sep =',')
     dataset = tf.contrib.learn.datasets.base.load_csv_without_header(
         filename=dataset + '.csv', target_dtype=np.float64, features_dtype=np.float32)
     return dataset
 
 def scale_data(dataset):
-    print(dataset)
     for v in enumerate(dataset):
         v[1][0] = int(v[1][0]) / 16
         v[1][2] = int(v[1][2]) / 20640
         v[1][3] = int(v[1][3]) / 10
 
-    print('test:')
-    print(dataset)
-
-# def appendVeloToMap(segment,output_file):
-#     tmpVeloToMap = []
-#     with open(output_file, 'r') as f:
-#         reader = csv.DictReader(f)
-#         print(reader)
-#         for row in reader:
-#             i =0
-#             for k, v in row.items():         # get segment_id
-#                 print(v)
-#                 print('--------')
-#                 if i% COUNT_COLUMN == 5 and data = :
-#                     tmpVeloToMap.append(v)
-#                 i+= 1
-#     return tmpVeloToMap
 def file_to_print(rootPath,dir,cur_day_of_weeks):
     for subDir in os.listdir(rootPath + dir):
         sub_dir = rootPath + dir + subDir
         if (os.path.isdir(sub_dir)):
-            for filePath in os.listdir(sub_dir):
+            for filePath in sorted(os.listdir(sub_dir)):
                 print(filePath)
                 day_of_weeks = datetime.datetime.strptime(os.path.splitext(filePath)[0], '%Y-%m-%d').weekday()
                 print(day_of_weeks)
@@ -132,25 +108,37 @@ def file_to_print(rootPath,dir,cur_day_of_weeks):
                     print(filePath)
                     return filePath
 
-def print_file(rootPath,ev,predictArr):
+def print_file(rootPath,predict):
+    predictArr=np.array(predict)
+
     index =1
-    for day_of_week in range(0, 6):
+    for day_of_week in range(0, 7):
         file_print = file_to_print(rootPath, '/Data_predict/', day_of_week)
         print(file_print)
-        print(ev)
         if file_print is not None:
             with open(file_print, 'r') as fin, open('day' + str(day_of_week) + '.csv', 'w') as fout:
-                first_row = True
+                # remove duplicate column
                 for line in iter(fin.readline, ''):
-                    if index == 1 or first_row == True:
-                        fout.write(line.replace('\n', ', ' + str(predictArr[index]) + ',' + 'MSE: ' + str(ev['loss']) + ',' + 'RMSE: ' + str(ev['rmse']) + ',' + 'MAPE: ' + str( ev['mape']) + ',' + 'MASE: ' + str(ev['mase']) + '\n'))
-                        first_row = False
-                    else:
-                        fout.write(line.replace('\n', ', ' + str(predictArr[index]) + '\n'))
+                    fout.write(line.replace('\n', ', ' + str(predictArr[0][index]) + '\n'))
                     index += 1
-            file_plot = file_print
+            file_plot = 'day' + str(day_of_week) + '.csv'
         day_of_week += 1
     return file_plot
+# def get_data():
+#     with open(file_plot, 'r') as f:
+#         reader = csv.DictReader(f)
+#         num_cols = len(next(reader))
+#         print("Cols %s:" % (num_cols))
+#         print(reader)
+#         for row in reader:
+#             i = 0
+#             for k, v in row.items():  # get segment_id
+#                 if i % COUNT_COLUMN == 2:
+#                     tempSeg.append(v)
+#                 i += 1
+#         # select random segment to plot
+#         rand_seg = random.choice(list(tempSeg))
+#         print(rand_seg)
 def model_fn(features, labels, mode, params):
     """Model function for Estimator."""
 
@@ -167,12 +155,17 @@ def model_fn(features, labels, mode, params):
 
     # Reshape output layer to 1-dim Tensor to return predictions
     predictions = tf.reshape(output_layer, [-1])
+    # classes = tf.as_string(tf.argmax(predictions, 1))
 
     # Provide an estimator spec for `ModeKeys.PREDICT`.
     if mode == tf.estimator.ModeKeys.PREDICT:
+        # export_outputs = {"classes": tf.estimator.export.ClassificationOutput(classes=classes)}
+        export_outputs = {"classes": tf.estimator.export.PredictOutput({"x": predictions})}
         return tf.estimator.EstimatorSpec(
             mode=mode,
-            predictions={"velocity": predictions,})
+            predictions={"velocity": predictions},
+            export_outputs=export_outputs
+        )
 
 
     # Calculate loss using mean squared error
@@ -191,6 +184,7 @@ def model_fn(features, labels, mode, params):
         "mape": mean_absolute_percentage_error(labels,predictions),
         "mase": mean_absolute_scaled_error(labels,predictions)
     }
+
     # Provide an estimator spec for `ModeKeys.EVAL` and `ModeKeys.TRAIN` modes.
     return tf.estimator.EstimatorSpec(
         mode=mode,
@@ -210,16 +204,21 @@ def mean_absolute_scaled_error(labels,predictions):
     mean, op = tf.metrics.mean(loss)
     return mean, op
 
-def plot_segment():
+def plot_segment(tempVeloToMap, segment):
     # x = np.array([datetime.datetime(2017, 11, 17, 0, i) for i in range(60)])
     # y = np.random.randint(100, size=x.shape)
+    x = np.array([i for i in range(95)])
+    y = np.array([i for i in tempVeloToMap])
+
+    plt.plot(x, y)
+    plt.show()
 
     fig = plt.figure()
     fig.suptitle('Velocity in day of segment', fontsize=14, fontweight='bold')
 
     ax = fig.add_subplot(111)
     fig.subplots_adjust(top=0.85)
-    ax.set_title('Segment')
+    ax.set_title('Segment %s' % segment)
 
     ax.set_xlabel('Frame')
     ax.set_ylabel('Velocity')
@@ -239,11 +238,8 @@ def plot_segment():
     ax.plot([2], [1], 'o')
     ax.annotate('annotate', xy=(2, 1), xytext=(3, 4),
                 arrowprops=dict(facecolor='black', shrink=0.05))
+    ax.axis([1, 95, 0, 60])
 
-    # ax.axis([0, 10, 0, 10])
-    x = np.array([i for i in range(95)])
-    y = np.random.randint(100, size=x.shape)
 
-    plt.plot(x, y)
     plt.show()
     fig.savefig('test.jpg')
