@@ -13,67 +13,22 @@ import csv
 import tensorflow as tf
 import numpy as np
 import os
-from tensorflow.contrib import rnn
 import datetime
 import pandas as pd
 import re
+
 FLAGS = None
 COUNT_COLUMN = 6
 EVAL_FILE = '/tmp/phuong/ev.csv'
-
+# EVAL_FILE = '/home/tesla/Desktop/LV/tmp/phuonghq/ev.csv'
 tf.logging.set_verbosity(tf.logging.INFO)
 
-LSTM_SIZE = 1  # number of hidden layers in each of the LSTM cells
 NODE = 100
 
-# create the inference model
-# def simple_rnn(features, labels, mode,params):
-#     # 0. Reformat input shape to become a sequence
-#     x = tf.split(features["x"], 3, 1)
-#     print('x={}'.format(x))
-#
-#     # 1. configure the RNN
-#     lstm_cell = rnn.BasicLSTMCell(LSTM_SIZE, forget_bias=1.0)
-#     outputs, _ = rnn.static_rnn(lstm_cell, x, dtype=tf.float64)
-#
-#     # slice to keep only the last cell of the RNN
-#     outputs = outputs[-1]
-#     print('last outputs={}'.format(outputs))
-#
-#     # output is result of linear activation of last layer of RNN
-#     weight = tf.Variable(tf.random_normal([LSTM_SIZE, 1]))
-#     bias = tf.Variable(tf.random_normal([1]))
-#     predictions = tf.nn.tanh(tf.matmul(outputs, weight)+ bias)
-#     labels = tf.nn.tanh(tf.matmul(labels, weight) + bias)
-#
-#     # 2. Define the loss function for training/evaluation
-#     print('labels={}'.format(labels))
-#     print('preds={}'.format(predictions))
-#     loss = tf.losses.mean_squared_error(labels, predictions)
-#     eval_metric_ops = {
-#         "rmse": tf.metrics.root_mean_squared_error(labels, predictions)
-#     }
-#
-#     # 3. Define the training operation/optimizer
-#     train_op = tf.contrib.layers.optimize_loss(
-#         loss=loss,
-#         global_step=tf.contrib.framework.get_global_step(),
-#         learning_rate=params["learning_rate"],
-#         optimizer="SGD")
-#
-#     # 4. Create predictions
-#     predictions_dict = {"predicted": predictions}
-#
-#     # 5. return ModelFnOps
-#     return tf.estimator.EstimatorSpec(
-#         mode=mode,
-#         predictions=predictions_dict,
-#         loss=loss,
-#         train_op=train_op,
-#         eval_metric_ops=eval_metric_ops)
-def load_data(rootPath,dir,dataset):
+
+def load_data(rootPath, dir, dataset):
     frame = pd.DataFrame()
-    for subDir in os.listdir(rootPath + dir):
+    for subDir in sorted(os.listdir(rootPath + dir)):
         sub_dir = rootPath + dir + subDir
         print(sub_dir)
         if (os.path.isdir(sub_dir)):
@@ -81,13 +36,14 @@ def load_data(rootPath,dir,dataset):
             for filePath in sorted(os.listdir(sub_dir)):
                 filePath = sub_dir + "/" + filePath
                 print(filePath)
-                df = pd.read_csv(filePath,sep=',',header=None,index_col=0)
+                df = pd.read_csv(filePath, sep=',', header=None, index_col=0)
                 list_.append(df)
             frame = pd.concat(list_)
-    frame.to_csv(dataset+ '.csv',sep =',')
+    frame.to_csv(dataset + '.csv', sep=',')
     dataset = tf.contrib.learn.datasets.base.load_csv_without_header(
         filename=dataset + '.csv', target_dtype=np.float64, features_dtype=np.float32)
     return dataset
+
 
 def scale_data(dataset):
     for v in enumerate(dataset):
@@ -95,50 +51,41 @@ def scale_data(dataset):
         v[1][2] = int(v[1][2]) / 20640
         v[1][3] = int(v[1][3]) / 10
 
-def file_to_print(rootPath,dir,cur_day_of_weeks):
-    for subDir in os.listdir(rootPath + dir):
-        sub_dir = rootPath + dir + subDir
+
+def print_file(rootPath, predict):
+    predictArr = np.array(predict)
+
+    index = 1
+
+    for subDir in os.listdir(rootPath + '/Data_predict/'):
+        sub_dir = rootPath + '/Data_predict/' + subDir
         if (os.path.isdir(sub_dir)):
-            for filePath in sorted(os.listdir(sub_dir)):
-                print(filePath)
-                day_of_weeks = datetime.datetime.strptime(os.path.splitext(filePath)[0], '%Y-%m-%d').weekday()
-                print(day_of_weeks)
-                if(day_of_weeks == cur_day_of_weeks):
-                    filePath = sub_dir + "/" + filePath
-                    print(filePath)
-                    return filePath
+            for file in sorted(os.listdir(sub_dir)):
+                if file is not None:
+                    filePath = sub_dir + "/" + file
+                    day_of_week = datetime.datetime.strptime(os.path.splitext(file)[0], '%Y-%m-%d').weekday()
+                    with open(filePath, 'r') as fin, open('test' + str(day_of_week) + '.csv', 'w') as fout:
+                        writer = csv.writer(fout)
+                        writer.writerow(["Frame", "Day of week", "Segment", "Velocity", "Velocity", "Predict"])
+                        # for row in csv.reader(fin):
+                        #   writer.writerow(row[:-1])
+                        # remove duplicate column
+                        for line in iter(fin.readline, ''):
+                            # print(line)
+                            fout.write(line.replace('\n', ', ' + str(predictArr[0][index]) + '\n'))
+                            index += 1
+    today = datetime.datetime.today().weekday()
+    # file_plot = 'day' + '2' + '.csv'
+    file_plot = 'test' + str(day_of_week) + '.csv'
+    return file_plot  # fileplot
 
-def print_file(rootPath,predict):
-    predictArr=np.array(predict)
 
-    index =1
-    for day_of_week in range(0, 7):
-        file_print = file_to_print(rootPath, '/Data_predict/', day_of_week)
-        print(file_print)
-        if file_print is not None:
-            with open(file_print, 'r') as fin, open('day' + str(day_of_week) + '.csv', 'w') as fout:
-                # remove duplicate column
-                for line in iter(fin.readline, ''):
-                    fout.write(line.replace('\n', ', ' + str(predictArr[0][index]) + '\n'))
-                    index += 1
-            file_plot = 'day' + str(day_of_week) + '.csv'
-        day_of_week += 1
-    return file_plot
-# def get_data():
-#     with open(file_plot, 'r') as f:
-#         reader = csv.DictReader(f)
-#         num_cols = len(next(reader))
-#         print("Cols %s:" % (num_cols))
-#         print(reader)
-#         for row in reader:
-#             i = 0
-#             for k, v in row.items():  # get segment_id
-#                 if i % COUNT_COLUMN == 2:
-#                     tempSeg.append(v)
-#                 i += 1
-#         # select random segment to plot
-#         rand_seg = random.choice(list(tempSeg))
-#         print(rand_seg)
+def get_segment(file_plot):
+    df = pd.read_csv(file_plot, usecols=[2])
+    c = df['Segment'].value_counts()
+    return c.index[0]
+
+
 def model_fn(features, labels, mode, params):
     """Model function for Estimator."""
 
@@ -167,7 +114,6 @@ def model_fn(features, labels, mode, params):
             export_outputs=export_outputs
         )
 
-
     # Calculate loss using mean squared error
     loss = tf.losses.mean_squared_error(labels, predictions)
     print(labels)
@@ -179,10 +125,11 @@ def model_fn(features, labels, mode, params):
 
     # Calculate root mean squared error as additional eval metric
     eval_metric_ops = {
+        "mae": mean_absolute_error(labels, predictions),
         "rmse": tf.metrics.root_mean_squared_error(
             tf.cast(labels, tf.float32), predictions),
-        "mape": mean_absolute_percentage_error(labels,predictions),
-        "mase": mean_absolute_scaled_error(labels,predictions)
+        "mape": mean_absolute_percentage_error(labels, predictions),
+        "mase": mean_absolute_scaled_error(labels, predictions)
     }
 
     # Provide an estimator spec for `ModeKeys.EVAL` and `ModeKeys.TRAIN` modes.
@@ -193,26 +140,38 @@ def model_fn(features, labels, mode, params):
         eval_metric_ops=eval_metric_ops,
     )
 
-def mean_absolute_percentage_error(labels, predictions):
-   loss = tf.reduce_mean(tf.abs(tf.cast(labels, tf.float32)-predictions)/predictions) * 100
-   mean, op = tf.metrics.mean(loss)
-   return mean, op
 
-def mean_absolute_scaled_error(labels,predictions):
-    tmp_loss = tf.reduce_sum(tf.abs(predictions - tf.reduce_mean(predictions))) / NODE
-    loss = tf.reduce_mean(tf.abs(predictions - tf.cast(labels,tf.float32)))/tmp_loss
+def mean_absolute_error(labels, predictions):
+    loss = tf.reduce_mean(tf.abs(tf.cast(labels, tf.float32) - predictions))
     mean, op = tf.metrics.mean(loss)
     return mean, op
 
-def plot_segment(tempVeloToMap, segment):
+
+def mean_absolute_percentage_error(labels, predictions):
+    loss = tf.reduce_mean(tf.abs(tf.cast(labels, tf.float32) - predictions) / predictions) * 100
+    mean, op = tf.metrics.mean(loss)
+    return mean, op
+
+
+def mean_absolute_scaled_error(labels, predictions):
+    tmp_loss = tf.reduce_sum(tf.abs(predictions - tf.reduce_mean(predictions))) / NODE
+    loss = tf.reduce_mean(tf.abs(predictions - tf.cast(labels, tf.float32))) / tmp_loss
+    mean, op = tf.metrics.mean(loss)
+    return mean, op
+
+
+def plot_segment(tempVeloToMap, frToMap, segment):
     # x = np.array([datetime.datetime(2017, 11, 17, 0, i) for i in range(60)])
     # y = np.random.randint(100, size=x.shape)
-    x = np.array([i for i in range(95)])
-    y = np.array([i for i in tempVeloToMap])
-
-    plt.plot(x, y)
-    plt.show()
-
+    # x = np.array([i for i in range(95)])
+    # x = np.array([i for i in frToMap])
+    # y = np.array([i for i in tempVeloToMap])
+    #
+    # # plt.plot(x, y)
+    # plt.scatter(x,y)
+    # plt.show()
+    # plt.figure().savefig('f1.jpg')
+    print('1111')
     fig = plt.figure()
     fig.suptitle('Velocity in day of segment', fontsize=14, fontweight='bold')
 
@@ -222,24 +181,28 @@ def plot_segment(tempVeloToMap, segment):
 
     ax.set_xlabel('Frame')
     ax.set_ylabel('Velocity')
+    #
+    # ax.text(3, 8, 'boxed italics text in data coords', style='italic',
+    #         bbox={'facecolor': 'red', 'alpha': 0.5, 'pad': 10})
+    #
+    # ax.text(2, 6, r'an equation: $E=mc^2$', fontsize=15)
+    #
+    # ax.text(3, 2, u'unicode:PHUONGHQ')
+    #
+    # ax.text(0.95, 0.01, 'colored text in axes coords',
+    #         verticalalignment='bottom', horizontalalignment='right',
+    #         transform=ax.transAxes,
+    #         color='green', fontsize=15)
+    #
 
-    ax.text(3, 8, 'boxed italics text in data coords', style='italic',
-            bbox={'facecolor': 'red', 'alpha': 0.5, 'pad': 10})
+    # ax.annotate('annotate', xy=(2, 1), xytext=(3, 4),
+    #             arrowprops=dict(facecolor='black', shrink=0.05))
+    # ax.axis([1, 95, 0, 60])
+    x = np.array([i for i in frToMap])
+    y = np.array([i for i in tempVeloToMap])
 
-    ax.text(2, 6, r'an equation: $E=mc^2$', fontsize=15)
-
-    ax.text(3, 2, u'unicode:PHUONGHQ')
-
-    ax.text(0.95, 0.01, 'colored text in axes coords',
-            verticalalignment='bottom', horizontalalignment='right',
-            transform=ax.transAxes,
-            color='green', fontsize=15)
-
-    ax.plot([2], [1], 'o')
-    ax.annotate('annotate', xy=(2, 1), xytext=(3, 4),
-                arrowprops=dict(facecolor='black', shrink=0.05))
-    ax.axis([1, 95, 0, 60])
-
+    ax.plot(x, y, 'o')
 
     plt.show()
-    fig.savefig('test.jpg')
+
+    fig.savefig('f2.png')

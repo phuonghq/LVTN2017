@@ -23,12 +23,12 @@ from utils import model_fn,load_data,scale_data
 FLAGS = None
 DEFAULT_BATCH_SIZE = 100
 EXPORT_DIR_BASE = '\\tmp\\phuong\\'
-INPUT_COLUMNS = 4
+# EXPORT_DIR_BASE = '/home/tesla/Desktop/LV/tmp/phuonghq/'
 tf.logging.set_verbosity(tf.logging.INFO)
 
 # Learning rate for the model
 # 0.0001 -0.0002
-LEARNING_RATE = 0.000005
+LEARNING_RATE = 0.00001
 
 
 def serving_input_receiver_fn():
@@ -87,7 +87,7 @@ def main(unused_argv):
     print("Loss: %s" % ev["loss"])
     print("Root Mean Squared Error: %s" % ev["rmse"])
     f = open(EXPORT_DIR_BASE + 'ev.csv', 'w')
-    f.write('MSE: ' + str(ev['loss']) + ',' + 'RMSE: ' + str(
+    f.write('MAE: ' + str(ev['mae']) + ',' + 'RMSE: ' + str(
                                 ev['rmse']) + ',' + 'MAPE: ' + str(ev['mape']) + ',' + 'MASE: ' + str(ev['mase']) )
     f.close()
 if __name__ == "__main__":
