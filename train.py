@@ -18,17 +18,17 @@ import csv
 import numpy as np
 import tensorflow as tf
 import os
-from utils import model_fn,load_data,scale_data
+from utils import *
 
 FLAGS = None
-DEFAULT_BATCH_SIZE = 100
-EXPORT_DIR_BASE = '\\tmp\\phuong\\'
-# EXPORT_DIR_BASE = '/home/tesla/Desktop/LV/tmp/phuonghq/'
+DEFAULT_BATCH_SIZE = 4000
+
+EXPORT_DIR_BASE = rootPath + '/tmp/phuonghq/'
 tf.logging.set_verbosity(tf.logging.INFO)
 
 # Learning rate for the model
 # 0.0001 -0.0002
-LEARNING_RATE = 0.00001
+LEARNING_RATE = 0.000001
 
 
 def serving_input_receiver_fn():
@@ -41,15 +41,13 @@ def main(unused_argv):
     if os.path.exists(EXPORT_DIR_BASE) == True:
         shutil.rmtree(EXPORT_DIR_BASE)
 
-    # Load datasets
-    rootPath = os.path.abspath(os.path.dirname(__file__))
 
     # Training examples
     training_set = load_data(rootPath,'/Data_train/','training_set')
-
+    print(training_set)
     # Test examples
     test_set = load_data(rootPath,'/Data_test/','test_set')
-
+    print(test_set)
     # Set model params
     model_params = {"learning_rate": LEARNING_RATE}
 
@@ -70,7 +68,7 @@ def main(unused_argv):
         shuffle=True)
 
     # Train
-    nn.train(input_fn=train_input_fn, steps=5000)
+    nn.train(input_fn=train_input_fn, steps=50000)
     # export
     nn.export_savedmodel(EXPORT_DIR_BASE,
         serving_input_receiver_fn=serving_input_receiver_fn)
