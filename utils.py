@@ -15,17 +15,20 @@ import numpy as np
 import os
 import datetime
 import pandas as pd
-import re
+from tensorflow.contrib import rnn
+import scipy.interpolate
 
 # Find root
 rootPath = os.path.abspath(os.path.dirname(__file__))
-
+IMG_DIR = '/Output/Images/'
 FLAGS = None
 EVAL_FILE = rootPath + 'tmp/phuonghq/ev.csv'
 tf.logging.set_verbosity(tf.logging.INFO)
 
 TEMP_DIR = rootPath + '/tmp/phuonghq/'
 NODE = 100
+
+LSTM_SIZE = 1  # number of hidden layers in each of the LSTM cells
 
 
 def load_data(rootPath, dir, dataset):
@@ -80,10 +83,10 @@ def print_file(rootPath, predict):
                 if file is not None:
                     filePath = sub_dir + "/" + file
                     print(filePath)
-                    day_of_week = datetime.datetime.strptime(os.path.splitext(file)[0], '%Y-%m-%d').weekday()
-                    today = datetime.datetime.today().weekday()
-                    if day_of_week == today:
-                        file_plot = rootPath + '/Temp/' + 'new_' + file  ###
+                    # day_of_week = datetime.datetime.strptime(os.path.splitext(file)[0], '%Y-%m-%d').weekday()
+                    # today = datetime.datetime.today().weekday()
+                    # if day_of_week == today:
+                    #     file_plot = rootPath + '/Temp/' + 'new_' + file  ###
                     df = pd.read_csv(filePath, index_col=0, low_memory=False)
                     length = df.shape[0]
                     print(length)
@@ -94,7 +97,7 @@ def print_file(rootPath, predict):
                     end = start + length
                     start = end
 
-    # file_plot = 'Temp/' + 'new_' + file ###
+    file_plot = 'Temp/' + 'new_' + file ###
     return file_plot
 
 
@@ -102,6 +105,54 @@ def get_segment(file_plot):
     df = pd.read_csv(file_plot, index_col=0, usecols=[0, 2])
     c = df['Segment Id'].value_counts()
     return c.index[1]
+
+
+# create the inference model
+# def model_rnn(features, labels, mode, params):
+#     # 0. Reformat input shape to become a sequence
+#     x = tf.split(features["x"], 4, 1) # 8? 4
+#     print('x={}'.format(x))
+#
+#     # 1. configure the RNN
+#     lstm_cell = rnn.BasicLSTMCell(LSTM_SIZE, forget_bias=1.0)
+#
+#     outputs, _ = rnn.static_rnn(lstm_cell, x, dtype=tf.float32)
+#
+#     # slice to keep only the last cell of the RNN
+#     outputs = outputs[-1]
+#     print('last outputs={}'.format(outputs))
+#
+#     # output is result of linear activation of last layer of RNN
+#     weight = tf.Variable(tf.random_normal([LSTM_SIZE, 1]))
+#     bias = tf.Variable(tf.random_normal([1]))
+#     predictions = tf.nn.tanh(tf.matmul(outputs, weight) + bias)
+#     labels = tf.nn.tanh(tf.matmul(tf.cast(labels, tf.float32), weight) + bias)
+#
+#     # 2. Define the loss function for training/evaluation
+#     print('labels={}'.format(labels))
+#     print('preds={}'.format(predictions))
+#     loss = tf.losses.mean_squared_error(labels, predictions)
+#     eval_metric_ops = {
+#         "rmse": tf.metrics.root_mean_squared_error(labels, predictions)
+#     }
+#
+#     # 3. Define the training operation/optimizer
+#     train_op = tf.contrib.layers.optimize_loss(
+#         loss=loss,
+#         global_step=tf.contrib.framework.get_global_step(),
+#         learning_rate=params["learning_rate"],
+#         optimizer="SGD")
+#
+#     # 4. Create predictions
+#     predictions_dict = {"predicted": predictions}
+#
+#     # 5. return ModelFnOps
+#     return tf.estimator.EstimatorSpec(
+#         mode=mode,
+#         predictions=predictions_dict,
+#         loss=loss,
+#         train_op=train_op,
+#         eval_metric_ops=eval_metric_ops)
 
 
 def model_fn(features, labels, mode, params):
@@ -177,6 +228,8 @@ def mean_absolute_percentage_error(labels, predictions):
 
 def mean_absolute_scaled_error(labels, predictions):
     n = predictions.shape
+    print(n)
+
     tmp_loss = tf.reduce_sum(tf.abs(np.diff(predictions))) / (n - 1)
     # tmp_loss = tf.reduce_sum(tf.abs(predictions - tf.reduce_mean(predictions))) / (n-1)
 
@@ -256,3 +309,102 @@ def plot_by_frame(file_plot, frame):
     print(segToMap)
     print(veloToMap)
     plot(tempVeloToMap, segToMap, veloToMap, frame, 1)
+# 113556 -> 113547, 46450 - > 46431
+# 122000 - 122079
+# 122149 - 122182, 113270 - 113291
+def get_velo_street(arrSeg,file_plot):
+    arrFr = []
+    arrPredictVelo = []
+    arrAfterSeg = []
+    arrRealVelo = []
+    with open(file_plot, 'r') as f:
+        reader = csv.DictReader(f)
+        for row in reader:  # for each row in the reader object
+            if int(row['Segment Id']) in arrSeg and float(row['Predict']) < 70.0:
+                arrFr.append(int(row['Frame']))
+                arrPredictVelo.append(float(row['Predict']))
+                arrAfterSeg.append(int(row['Segment Id']))
+                arrRealVelo.append(float(row['Velocity']))
+
+    print(arrAfterSeg)
+    print(arrFr)
+    print(arrRealVelo)
+    return arrAfterSeg, arrFr, arrPredictVelo,arrRealVelo
+    # plot_by_street(arrAfterSeg,arrFr,arrVelo,name_street)
+
+def init_plot_by_street(x,y,val,street,location,var_flag,delta,index):
+    print(x)
+    print(y)
+    print(val)
+    print('data: %d' % delta)
+    fig = plt.figure()
+    if var_flag == 1:
+        fig.suptitle('Predict ' + street, fontsize=12, fontweight='bold')
+    else:
+        fig.suptitle('Real ' + street, fontsize=12, fontweight='bold')
+
+    ax = fig.add_subplot(111)
+    fig.subplots_adjust(top=0.85)
+    ax.set_title('Street: ' + location)
+    ax.set_xlabel('Segment')
+    ax.set_ylabel('Frame')
+
+    # get count for línpace
+
+    # DELTA = 113547 - 46450
+    x_ = []
+    for value in x:
+        if index != 'None' and value > index:
+            value = value - delta
+        x_.append(value)
+
+    xi, yi = np.linspace(min(x_), max(x_), max(x_) - min(x_) + 1), np.linspace(min(y), max(y), max(y) - min(y) + 1)
+
+    xi, yi = np.meshgrid(xi, yi)
+    print(x_)
+    print(xi)
+    print(yi)
+    # Interpolate
+    rbf = scipy.interpolate.Rbf(x_, y, val, function='linear')
+    zi = rbf(xi, yi)
+    print(zi)
+    tmp = list(zip(x_, y))
+
+    for i in range(len(zi)):
+        for j in range(len(zi[i])):
+            ttt = tuple(list(map(int, (xi[i][j], yi[i][j]))))
+            if ttt not in tmp:
+                zi[i][j] = 0
+    print('|||||')
+    print(x_)
+    print(y)
+    print(zi)
+    # mask some 'bad' data, in your case you would have: data == 0
+    zi = np.ma.masked_where(zi <= 0.00, zi)
+
+    cmap = plt.cm.OrRd
+    cmap.set_bad(color='white')
+    plt.imshow(zi, vmin=min(val), vmax=max(val), origin='lower',
+               extent=[0, max(x_)-min(x_), min(y), max(y)], aspect="auto", cmap='jet_r', interpolation='None')
+    plt.subplots_adjust(hspace=0.5)
+    plt.colorbar()
+    plt.show()
+
+    path = rootPath + IMG_DIR + street + '/'
+    print(path)
+    dir = os.path.dirname(path)
+    print(dir)
+    if not os.path.exists(dir):
+        os.makedirs(dir)
+        print('111')
+    if var_flag == 0:
+        fig.savefig(dir + '/' + location +'_Real.png')
+    else:
+        fig.savefig(dir+ '/' + location  +'_Predict.png')
+
+
+def plot_by_street(x,y,predict_val,real_val,name_street,location,index):
+    delta = max(abs(i - j) for (i, j) in zip(x[1:], x[:-1]))
+
+    init_plot_by_street(x,y,real_val,name_street,location,0, delta - 1,index)
+    init_plot_by_street(x,y,predict_val,name_street,location,1,delta - 1,index)
