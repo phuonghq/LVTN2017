@@ -1,7 +1,6 @@
 # -*- coding: utf-8 -*-
 """
 Created on Wed Nov  1 16:55:57 2017
-
 @author: lovel
 """
 
@@ -155,7 +154,7 @@ def mean_absolute_scaled_error(y_true, y_pred):
 
 def newPlot(predictDF, realDF, ARIMADF, seg_plot):
     fig = plt.figure()
-    fig.set_size_inches(12, 7, forward=True)
+    fig.set_size_inches(12, 6, forward=True)
     fig.suptitle('Velocity', fontsize=14, fontweight='bold')
 
     ax = fig.add_subplot(111)
@@ -172,20 +171,21 @@ def newPlot(predictDF, realDF, ARIMADF, seg_plot):
     plt.plot(x, predictDF.values)
     plt.plot(x, realDF.values)
     plt.plot(x, ARIMADF.values)
-    plt.legend(['Predict', 'Real', 'ARIMA'], bbox_to_anchor=(1, 1), loc=2, borderaxespad=0.)
+    plt.legend(['RNN', 'Real', 'ARIMA'], bbox_to_anchor=(1, 1), loc=2, borderaxespad=0.)
     # plt.show()
     # print(fig)
     name = 'linePlot'
     url = rootPath + '/Output/Images/' + 'linePlot.png'
     fig.savefig(url)
-    fig.close()
+    plt.close()
     return name, url
 
 
-def linePlotBySeg(file_plot, seg_plot):
+def linePlotBySeg( seg_plot):
     predictVeloToMap = []
     realVeloToMap = []
     ARIMAVeloToMap = []
+    file_plot = rootPath + '/Temp/final_data.csv'
     real_value_file = rootPath + '/Predict/Predict/tmp_predict.csv'
     ARIMA_file = rootPath + '/Temp/final_data_ARIMA.csv'
     # funtion to get segment
@@ -234,15 +234,17 @@ def init_plot_by_street(x, val, location, delta, n_segment, frRequest, name, isA
     # print(val)
     # print('delta: %d' % delta)
     fig = plt.figure()
-    # fig.suptitle(location, fontsize=12, fontweight='bold')
-
+    if isArima == False:
+        fig.suptitle('RNN', fontsize=12, fontweight='bold')
+    else:
+         fig.suptitle('ARIMA', fontsize=12, fontweight='bold')
     ax = fig.add_subplot(111)
     fig.subplots_adjust(top=0.85)
     ax.set_title('Street: ' + location)
     ax.set_xlabel('Segment')
     ax.set_ylabel('Frame')
 
-    # get count for lÃ­npace
+    # get count for línpace
 
     # DELTA = 113547 - 46450
     # x_ = []

@@ -21,7 +21,7 @@ FLAGS = None
 # Learning rate for the model
 # LEARNING_RATE = 0.015  # 0.015
 EXPORT_DIR_BASE = rootPath + '/Model/phuonghq/'
-STEP_SIZE = 2000  # 7000
+STEP_SIZE = 9000  # 7000
 VO_THI_SAU_1 = list(range(46431, 46451))
 VO_THI_SAU_1.extend(range(113547, 113557))
 # VO_THI_SAU_2 = list(range(113547, 113556))
@@ -81,7 +81,7 @@ def train(frameRequest, offset, learning_rate):
                                               context_feature_columns=None,
                                               num_units=10,
                                               cell_type='lstm',
-                                              optimizer='SGD',
+                                              optimizer='Adagrad',
                                               learning_rate=learning_rate,
                                               # dropout_keep_probabilities = [0.5,0.5],
                                               config=run_config
@@ -150,22 +150,24 @@ def train(frameRequest, offset, learning_rate):
 
 
 def main(frameRequest, offset, learning_rate):
+   # predict(28)
     day_DF = pd.read_csv(rootPath + '/Predict/Predict/tmp_predict.csv', header=None,
                          usecols=[0])
 
-    for i in range(0, 96):
+    for i in range(0,1):
         output = train(i, offset, learning_rate)
         output_dayDF = pd.DataFrame(output)
         day_DF = pd.concat([day_DF, output_dayDF], axis=1)
         print(day_DF)
 
-    day_DF.to_csv(rootPath + '/Temp/' + 'final_data.csv', sep=',', index=False, header=None)
+    day_DF.to_csv(rootPath + '/Temp/' + 'final_data_predict.csv', sep=',', index=False, header=None)
 
 
 def predict(frameRequest):
     output_file = rootPath + '/Temp/' + 'final_data.csv'
     df_predict = pd.read_csv(output_file, header=None,
-                             usecols=[frameRequest + 1])
+                             usecols=[frameRequest + 1 ])
+    print(df_predict.columns)
     real_file = rootPath + '/Predict/Predict/tmp_predict.csv'
     df_real = pd.read_csv(real_file, header=None,
                           usecols=[0, frameRequest + 1])
@@ -190,7 +192,8 @@ def predict(frameRequest):
     dictVTS = street_plot(VO_THI_SAU_1, output_file, frameRequest, 'VOTHISAU', 'Vo Thi Sau', False)
     dict3THANG2 = street_plot(DUONG_3THANG2_1, output_file, frameRequest, '3_THANG_2', '3 Thang 2', False)
     dictDBP = street_plot(DBP, output_file, frameRequest, 'DBP', 'Dien Bien Phu', False)
-    dictPlot = {'CMT8': dictCMT8, 'VTS': dictVTS, '3_THANG_2': dict3THANG2, 'DBP': dictDBP}
+    dictXVNT = street_plot(XVNT_1, output_file, frameRequest, 'XVNT', 'Xo Viet Nghe Tinh', False)
+    dictPlot = {'CMT8': dictCMT8, 'VTS': dictVTS, '3_THANG_2': dict3THANG2, 'DBP': dictDBP,'XVNT': dictXVNT}
 
     # ARIMA
     ARIMA_dir = rootPath + '/ARIMA/Result/'
@@ -200,16 +203,16 @@ def predict(frameRequest):
     arima_VTS = street_plot(VO_THI_SAU_1, arima_plot, frameRequest, 'VOTHISAU', 'Vo Thi Sau', True)
     arima_3THANG2 = street_plot(DUONG_3THANG2_1, arima_plot, frameRequest, '3_THANG_2', '3 Thang 2', True)
     arima_DBP = street_plot(DBP, arima_plot, frameRequest, 'DBP', 'Dien Bien Phu', True)
-    arima_Dict_Plot = {'CMT8': arima_CMT8, 'VTS': arima_VTS, '3_THANG_2': arima_3THANG2, 'DBP': arima_DBP}
+    arima_XVNT = street_plot(XVNT_1, arima_plot, frameRequest, 'XVNT', 'Xo Viet Nghe Tinh', True)
+    arima_Dict_Plot = {'CMT8': arima_CMT8, 'VTS': arima_VTS, '3_THANG_2': arima_3THANG2, 'DBP': arima_DBP,'XVNT': arima_XVNT}
 
-    ARIMA_df = pd.read_csv(ARIMA_dir + 'Frame_' + str(frameRequest) + '.csv', usecols=[0, frameRequest, 97, 98],
+    ARIMA_df = pd.read_csv(ARIMA_dir + 'Frame_' + str(frameRequest) + '.csv', usecols=[0, frameRequest + 1, 97, 98],
                            header=None)
 
     ARIMA_error = pd.read_csv(ARIMAError_dir + 'Frame_' + str(frameRequest) + '_ev' + '.csv', header=None, skiprows=[1])
     ARIMA_error = ARIMA_error.values
 
-    return data_frame, ARIMA_df, dictPlot, arima_Dict_Plot, output_file, rmse, mae, mape, mase, ARIMA_error[0][1], \
-           ARIMA_error[0][0], ARIMA_error[0][2], ARIMA_error[0][3]
+    return data_frame, ARIMA_df, dictPlot, arima_Dict_Plot, rmse, mae, mape, mase, ARIMA_error[0][1], ARIMA_error[0][0], ARIMA_error[0][2], ARIMA_error[0][3]
 
 
 if __name__ == "__main__":
